@@ -1,10 +1,17 @@
 package com.chandu.ResumeEmailSender.controller;
 
+import com.chandu.ResumeEmailSender.model.HrDetails;
 import com.chandu.ResumeEmailSender.service.EmailService;
 import com.chandu.ResumeEmailSender.service.ExcelReaderService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.SpringApplication;
+import org.springframework.context.ApplicationContext;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
+
+import java.util.List;
 
 @RestController
 public class ResumeMailerController {
@@ -15,27 +22,61 @@ public class ResumeMailerController {
     @Autowired
     private EmailService emailService;
 
+    @Autowired
+    private ApplicationContext applicationContext;
+
+    @Value("${resume.file.path}")
+    private String resumePath; // Load from application.properties
+
     @GetMapping("/send-emails")
     public String sendEmails() {
-        var hrDetailsList = excelReaderService.readHrDetails();
+        List<HrDetails> hrDetailsList = excelReaderService.readHrDetails();
 
-        // Path to your resume file
-        String resumePath = "\"C:\\Users\\chand\\eclipse-workspace\\ResumeEmailSender\\src\\main\\resources\\ChanduResume.pdf\""; // Update this path
+        if (hrDetailsList.isEmpty()) {
+            return "No HR details found in the Excel file.";
+        }
 
-        for (var hrDetails : hrDetailsList) {
-            String subject = "Application for Opportunities at " + hrDetails.getCompanyName();
+        sendEmailsInBatches(hrDetailsList);
+
+        return "Emails are being sent in batches with delays. Check logs for progress.";
+    }
+
+    @Async // Runs email sending in a background thread
+    public void sendEmailsInBatches(List<HrDetails> hrDetailsList) {
+        for (HrDetails hrDetails : hrDetailsList) {
+            String hrEmail = hrDetails.getHrEmail();
+
+            // Validate email
+            if (hrEmail == null || hrEmail.trim().isEmpty() || !hrEmail.contains("@")) {
+                System.out.println("Skipping invalid email: " + hrEmail);
+                continue;
+            }
+
+            String subject = "Java Backend Developer | Opportunities at " + hrDetails.getCompanyName();
+
             String body = "Dear " + hrDetails.getHrName() + ",\n\n" +
-                    "I hope this message finds you well. My name is Chandu Raparthi, and I am reaching out to express my interest in potential opportunities at " + hrDetails.getCompanyName() + ".\n\n" +
-                    "I have over 2.5 years of experience in IT development, specializing in advanced Java technologies. My expertise includes Java SE, Java EE, and contemporary frameworks such as Spring and Hibernate, which I have used to develop robust and scalable applications.\n\n" +
-                    "Thank you for your time and consideration.\n\n" +
+                    "I hope you’re doing well. I’m Chandu Raparthi, an Associate Java Developer at Edgerock Software Solutions, looking for Java Backend opportunities at " + hrDetails.getCompanyName() + ".\n\n" +
+                    "I have 2.3 years of experience in Java, Spring Boot, Hibernate, and Microservices, specializing in REST APIs, PostgreSQL/MySQL optimization, and security (JWT, OAuth2).\n\n" +
+                    "Please find my resume attached. Looking forward to your response.\n\n" +
                     "Best regards,\n" +
                     "Chandu Raparthi\n" +
                     "+91 94523 01058 | chanduraparthi21@gmail.com";
 
             // Send email with attachment
-            emailService.sendEmailWithAttachment(hrDetails.getHrEmail(), subject, body, resumePath);
+            emailService.sendEmailWithAttachment(hrEmail, subject, body, resumePath);
+            System.out.println("Email sent to: " + hrEmail);
+
+            try {
+                // Delay of 2 minutes before sending the next email
+                Thread.sleep(120000);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                System.err.println("Email sending interrupted: " + e.getMessage());
+            }
         }
 
-        return "Emails with attachments sent successfully!";
+        System.out.println("All emails sent. Shutting down application...");
+        int exitCode = SpringApplication.exit(applicationContext, () -> 0);
+        System.exit(exitCode);
     }
 }

@@ -1,15 +1,13 @@
 package com.chandu.ResumeEmailSender.service;
 
-
+import com.chandu.ResumeEmailSender.model.HrDetails;
 import org.apache.poi.ss.usermodel.*;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
-import com.chandu.ResumeEmailSender.model.HrDetails;
-
-import java.io.File;
 import java.io.FileInputStream;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -17,30 +15,62 @@ import java.util.List;
 public class ExcelReaderService {
 
     @Value("${excel.file.path}")
-    private String excelFilePath;
+    private String filePath; // Load file path from application.properties
 
     public List<HrDetails> readHrDetails() {
         List<HrDetails> hrDetailsList = new ArrayList<>();
 
-        try (FileInputStream fis = new FileInputStream(new File(excelFilePath));
-             Workbook workbook = new XSSFWorkbook(fis)) {
+        try (FileInputStream file = new FileInputStream(filePath);
+             Workbook workbook = new XSSFWorkbook(file)) {
 
             Sheet sheet = workbook.getSheetAt(0);
+            int totalRows = sheet.getPhysicalNumberOfRows();
 
-            for (Row row : sheet) {
-                if (row.getRowNum() == 0) continue; // Skip header row
+            System.out.println("Total Rows Found: " + totalRows);
 
-                // Adjust column indices based on your Excel structure
-                String hrName = row.getCell(1).getStringCellValue(); // Column B: Name
-                String hrEmail = row.getCell(2).getStringCellValue(); // Column C: Email
-                String companyName = row.getCell(4).getStringCellValue(); // Column E: Company
+            for (int i = 1; i < totalRows; i++) { // Start from row 1 (skip header)
+                Row row = sheet.getRow(i);
+                if (row == null) continue;
 
+                String hrName = getCellValue(row, 1); // Column B
+                String hrEmail = getCellValue(row, 2).trim(); // Column C (Email)
+                String companyName = getCellValue(row, 4); // Column E
+
+                if (hrEmail.isEmpty() || !isValidEmail(hrEmail)) {
+                    System.out.println("Skipping invalid email: " + hrName + " | Email: " + hrEmail);
+                    continue;
+                }
+
+                System.out.println("Processing: " + hrName + " | Email: " + hrEmail + " | Company: " + companyName);
                 hrDetailsList.add(new HrDetails(hrName, hrEmail, companyName));
             }
-        } catch (Exception e) {
+
+        } catch (IOException e) {
             e.printStackTrace();
         }
 
         return hrDetailsList;
+    }
+
+    private String getCellValue(Row row, int columnIndex) {
+        Cell cell = row.getCell(columnIndex, Row.MissingCellPolicy.RETURN_BLANK_AS_NULL);
+        if (cell == null) return "";
+
+        switch (cell.getCellType()) {
+            case STRING:
+                return cell.getStringCellValue().trim();
+            case NUMERIC:
+                return String.valueOf((long) cell.getNumericCellValue()); // Convert numeric to string
+            case BOOLEAN:
+                return String.valueOf(cell.getBooleanCellValue());
+            case FORMULA:
+                return cell.getCellFormula();
+            default:
+                return "";
+        }
+    }
+
+    private boolean isValidEmail(String email) {
+        return email.matches("^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,6}$");
     }
 }
