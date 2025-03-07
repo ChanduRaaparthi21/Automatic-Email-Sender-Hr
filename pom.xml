@@ -93,5 +93,6 @@
 				</configuration>
 			</plugin>
 		</plugins>
+		<finalName>EmailSender</finalName>
 	</build>
 </project>
