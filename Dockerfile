@@ -5,10 +5,10 @@ FROM openjdk:17-jdk-slim
 
 
 # Copy the built JAR file from the target directory to the container
-ADD target/EmailSender.jar EmailSender.jar
+ADD target/emailsender.jar emailsender.jar
 
 # Expose the application port (change if necessary)
 EXPOSE 8080
 
 # Run the application
-ENTRYPOINT ["java", "-jar", "/EmailSender.jar"]
+ENTRYPOINT ["java", "-jar", "/emailsender.jar"]
