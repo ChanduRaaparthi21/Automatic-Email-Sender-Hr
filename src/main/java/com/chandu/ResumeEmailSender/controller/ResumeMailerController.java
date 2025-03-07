@@ -32,7 +32,7 @@ public class ResumeMailerController {
 
         return "Email sending process has been initialized. " +
                 hrDetailsList.size() + " emails will be sent with 2-minute intervals. " +
-                "Check application logs for progress.";
+                "Check application logs for progress..";
     }
 
     @GetMapping("/preview-data")
